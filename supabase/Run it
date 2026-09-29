@@ -1,0 +1,8 @@
+npx create-next-app@latest past-questions-repo --typescript --tailwind --app --no-src-dir
+cd past-questions-repo
+# replace files as above
+npm install @supabase/ssr @supabase/supabase-js resend
+# paste .env.local
+# run supabase/schema.sql in Supabase SQL editor
+# create storage buckets: photos (public), questions (private)
+npm run dev
