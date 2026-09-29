@@ -1,0 +1,135 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import CameraCapture from '@/components/CameraCapture';
+import PasswordPair from '@/components/PasswordInput';
+import Spinner from '@/components/Spinner';
+
+type Role = 'student' | 'lecturer';
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [role, setRole] = useState<Role | null>(null);
+  const [form, setForm] = useState({
+    full_name: '', email: '', password: '', confirm: '',
+    department: '', level: '', courses: '',
+  });
+  const [photo, setPhoto] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!role) return setError('Please choose an account type.');
+    if (form.password !== form.confirm) return setError('Passwords do not match');
+    if (!photo) return setError('Passport photograph is required.');
+    setLoading(true);
+
+    // Pre-check email
+    const chk = await fetch('/api/auth/check-email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email }),
+    }).then(r => r.json());
+    if (chk.exists) { setLoading(false); return setError('This email is already registered.'); }
+
+    const res = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: form.email, password: form.password, full_name: form.full_name,
+        role, department: form.department,
+        level: role === 'student' ? form.level : null,
+        courses: form.courses.split(',').map(s => s.trim()).filter(Boolean),
+        photo_base64: photo,
+      }),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!res.ok) return setError(data.error || 'Registration failed');
+    router.push('/verify?email=' + encodeURIComponent(form.email));
+  }
+
+  // ----- Role choice screen -----
+  if (!role) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-6 py-10">
+        <h1 className="text-2xl font-bold mb-2">Create your account</h1>
+        <p className="text-gray-600 mb-8">Choose an account type</p>
+        <div className="w-full max-w-sm space-y-3">
+          <button onClick={() => setRole('student')}
+            className="w-full py-5 rounded-xl bg-indigo-600 text-white text-lg font-semibold shadow-md active:scale-[.98]">
+            🎓 Create Student Account
+          </button>
+          <button onClick={() => setRole('lecturer')}
+            className="w-full py-5 rounded-xl bg-emerald-600 text-white text-lg font-semibold shadow-md active:scale-[.98]">
+            📚 Create Lecturer Account
+          </button>
+        </div>
+        <p className="mt-6 text-sm text-gray-500">
+          Already registered? <a href="/login" className="text-indigo-600 font-medium">Login</a>
+        </p>
+      </main>
+    );
+  }
+
+  // ----- Form -----
+  return (
+    <main className="min-h-screen w-full px-4 py-6 sm:flex sm:items-center sm:justify-center sm:bg-gray-100">
+      <form onSubmit={submit}
+        className="w-full sm:max-w-lg bg-white sm:rounded-2xl sm:shadow-lg p-5 sm:p-8 space-y-4
+                   min-h-screen sm:min-h-0 flex flex-col">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">
+            {role === 'student' ? 'Student' : 'Lecturer'} Registration
+          </h1>
+          <button type="button" onClick={() => setRole(null)} className="text-sm text-gray-500">Change</button>
+        </div>
+
+        {error && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm">{error}</div>}
+
+        <input required placeholder="Full name"
+          value={form.full_name} onChange={e => set('full_name', e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" />
+
+        <input required type="email" placeholder="Email"
+          value={form.email} onChange={e => set('email', e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" />
+
+        <PasswordPair
+          password={form.password} setPassword={v => set('password', v)}
+          confirm={form.confirm} setConfirm={v => set('confirm', v)}
+        />
+
+        <input required placeholder="Department"
+          value={form.department} onChange={e => set('department', e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" />
+
+        {role === 'student' && (
+          <select required value={form.level} onChange={e => set('level', e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-indigo-500">
+            <option value="">Select level</option>
+            {['100','200','300','400','500'].map(l => <option key={l}>{l}</option>)}
+          </select>
+        )}
+
+        <input placeholder="Courses (comma-separated e.g. CSC101, MTH201)"
+          value={form.courses} onChange={e => set('courses', e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" />
+
+        <CameraCapture onCapture={setPhoto} />
+
+        <button disabled={loading}
+          className="w-full py-3 rounded-lg bg-indigo-600 text-white font-semibold mt-2
+                     disabled:opacity-60 flex items-center justify-center gap-2">
+          {loading ? <Spinner label="Creating account…" /> : 'Create Account'}
+        </button>
+
+        <p className="text-xs text-gray-500 text-center">
+          A verification link will be emailed to you. Your account stays inactive until verified.
+        </p>
+      </form>
+    </main>
+  );
+}
