@@ -1,0 +1,43 @@
+import { redirect } from 'next/navigation';
+import { getCurrentUser } from '@/lib/auth';
+import { supabaseServer } from '@/lib/supabase-server';
+import UploadForm from './UploadForm';
+
+export default async function LecturerDash() {
+  const profile = await getCurrentUser();
+  if (!profile) redirect('/login');
+  if (profile.role !== 'lecturer') redirect('/403');
+
+  const supabase = await supabaseServer();
+  const { data: mine } = await supabase
+    .from('past_questions').select('*')
+    .eq('uploaded_by', profile.id).order('created_at', { ascending: false });
+
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b px-4 py-3 flex items-center gap-3">
+        {profile.photo_url && <img src={profile.photo_url}
+          className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500" />}
+        <div>
+          <h1 className="font-bold">{profile.full_name}</h1>
+          <p className="text-xs text-gray-500">Lecturer • {profile.department}</p>
+        </div>
+      </header>
+
+      <section className="p-4 max-w-4xl mx-auto space-y-6">
+        <UploadForm department={profile.department || ''} />
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Your Uploads</h2>
+          <ul className="space-y-2">
+            {mine?.map(q => (
+              <li key={q.id} className="bg-white rounded-xl p-4 shadow-sm text-sm">
+                <b>{q.course_code}</b> — {q.title} ({q.year})
+              </li>
+            ))}
+            {!mine?.length && <p className="text-gray-500 text-sm">No uploads yet.</p>}
+          </ul>
+        </div>
+      </section>
+    </main>
+  );
+}
