@@ -1,0 +1,13 @@
+-- photos: anyone can read, users can write to their own folder
+create policy "photos read" on storage.objects for select using (bucket_id = 'photos');
+create policy "photos write" on storage.objects for insert with check (
+  bucket_id = 'photos' and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- questions: authenticated can read; only lecturers can upload
+create policy "questions read" on storage.objects for select using (
+  bucket_id = 'questions' and auth.role() = 'authenticated'
+);
+create policy "questions write" on storage.objects for insert with check (
+  bucket_id = 'questions' and public.current_role() = 'lecturer'
+);
