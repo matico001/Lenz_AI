@@ -1,0 +1,28 @@
+import { NextResponse } from 'next/server';
+import { supabaseServer } from '@/lib/supabase-server';
+import { requireRole } from '@/lib/auth';
+
+export async function POST(req: Request) {
+  const guard = await requireRole(['lecturer']);
+  if ('error' in guard)
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
+
+  const form = await req.formData();
+  const file = form.get('file') as File;
+  const meta = JSON.parse(form.get('meta') as string);
+
+  const supabase = await supabaseServer();
+  const path = `${meta.department}/${meta.level}/${meta.course_code}/${meta.year}-${Date.now()}.pdf`;
+
+  const { error: upErr } = await supabase.storage.from('questions').upload(path, file);
+  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+
+  const { error: insErr } = await supabase.from('past_questions').insert({
+    title: meta.title, department: meta.department, level: meta.level,
+    course_code: meta.course_code, year: meta.year,
+    file_path: path, uploaded_by: guard.profile.id,
+  });
+  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}
