@@ -1,0 +1,50 @@
+'use client';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+
+function Inner() {
+  const params = useSearchParams();
+  const email = params.get('email') || '';
+  const router = useRouter();
+  const [code, setCode] = useState('');
+  const [msg, setMsg] = useState('');
+
+  async function send() {
+    await fetch('/api/otp/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, purpose: 'verify' }),
+    });
+    setMsg('OTP sent to your email.');
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch('/api/otp/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, purpose: 'verify' }),
+    });
+    const d = await r.json();
+    if (!r.ok) return setMsg(d.error);
+    router.push('/login');
+  }
+
+  return (
+    <main className="min-h-screen flex items-center justify-center px-4">
+      <form onSubmit={verify} className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 space-y-4">
+        <h1 className="text-xl font-bold">Verify your email</h1>
+        <p className="text-sm text-gray-500">Email: <b>{email}</b></p>
+        {msg && <p className="text-sm text-indigo-700 bg-indigo-50 p-2 rounded">{msg}</p>}
+        <button type="button" onClick={send}
+          className="w-full py-2 rounded-lg border border-indigo-500 text-indigo-600 font-medium">
+          Send OTP code
+        </button>
+        <input required placeholder="6-digit code" maxLength={6}
+          value={code} onChange={e => setCode(e.target.value)}
+          className="w-full rounded-lg border px-4 py-3 text-center tracking-[0.5em] text-lg outline-none focus:border-indigo-500" />
+        <button className="w-full py-3 rounded-lg bg-indigo-600 text-white font-semibold">Verify</button>
+      </form>
+    </main>
+  );
+}
+
+export default function Page() { return <Suspense><Inner/></Suspense>; }
